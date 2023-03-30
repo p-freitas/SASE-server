@@ -1,13 +1,14 @@
 const koa = require('koa')
 const http = require('http')
 const socket = require('socket.io')
+require('dotenv').config();
 
 const app = new koa()
 const server = http.createServer(app.callback())
 const io = socket(server)
 
-const SERVER_HOST = '0.0.0.0'
-const SERVER_PORT = 8080
+const SERVER_HOST = process.env.NODE_SOCKET_URL
+const SERVER_PORT = process.env.NODE_SOCKET_PORT
 
 const passwords = {
   normal: [],
@@ -15,12 +16,11 @@ const passwords = {
   all: [],
 }
 
-const passwordList = []
+let passwordList = []
 const passwordListOnDisplay = []
 
 let N = 1
 let P = 1
-let count = 0
 
 const getNormalPassword = () => {
   const value = `N${N++}`
@@ -41,21 +41,22 @@ const getData = data => {
 }
 
 const handleNextPassword = (data, firstPassword) => {
-  console.log('data::::: ', data);
   io.sockets.emit('password.next', data)
   io.sockets.emit('password.tv.update', data)
   
   io.sockets.emit(`password.tv.${data}`, firstPassword)
+  data = data.toString().replace(/[{()}]/g, '');
+  passwordListOnDisplay.push(data)
 
   console.log(`[SOCKET] [SERVER] => NEXT PASSWORD ${firstPassword}`)
 }
+
 
 io.on('connection', socket => {
   console.log('[IO - CLIENT] Connection => server has a new connection')
 
   socket.on('password.onDisplay', data => {
     console.log('[SOCKET SERVER] New password type => ', data)
-    passwordListOnDisplay.push(data)
 
     io.sockets.emit('object.passwordsOnDisplay', passwordList)
   })
@@ -72,35 +73,21 @@ io.on('connection', socket => {
     getData(data)
     io.sockets.emit('object.passwords', passwords)
   })
+  
+  socket.on('passwords.deleteOnDisplay', data => {
+    console.log('[SOCKET SERVER] Delete password => ', data)
+
+    let filtered = passwordList.filter(elem => elem !== data);
+    
+    passwordList = filtered
+    io.sockets.emit('object.passwordsOnDisplay', passwordList)
+    io.sockets.emit('password.tv.update', passwordList)
+  })
 
   socket.on('password.next', data => {
-    const firstPassword = passwords['all'][0]
-    // console.log(firstPassword);
     passwordList.push(data)
 
     handleNextPassword(passwordList)
-
-    // const isNormalPassword = firstPassword?.startsWith('N') && count < 2
-
-    // if (isNormalPassword) {
-    //   handleNextPassword(data, firstPassword)
-    //   passwords['all'].splice(0, 1)
-
-    //   count++
-    // } else {
-    //   for (let i = 0; i <= passwords['all'].length; i++) {
-    //     const firstPassword = passwords['all'][i]
-
-    //     if (passwords['all'][i]?.startsWith('P')) {
-    //       handleNextPassword(data, firstPassword)
-    //       passwords['all'].splice(i, 1)
-    //       count = 0
-    //       break
-    //     }
-    //   }
-
-    //   count = 0
-    // }
   })
 
   socket.on('disconnect', () => {
