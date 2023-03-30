@@ -42,7 +42,7 @@ const getData = data => {
 
 const handleNextPassword = (data, firstPassword) => {
   io.sockets.emit('password.next', data)
-  io.sockets.emit('password.tv.update', data)
+  io.sockets.emit('password.tv.update', data, false)
   
   io.sockets.emit(`password.tv.${data}`, firstPassword)
   data = data.toString().replace(/[{()}]/g, '');
@@ -81,7 +81,7 @@ io.on('connection', socket => {
     
     passwordList = filtered
     io.sockets.emit('object.passwordsOnDisplay', passwordList)
-    io.sockets.emit('password.tv.update', passwordList)
+    io.sockets.emit('password.tv.update', passwordList, true)
   })
 
   socket.on('password.next', data => {
