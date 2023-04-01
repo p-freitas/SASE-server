@@ -76,11 +76,15 @@ io.on('connection', socket => {
   socket.on('passwords.delete', data => {
     console.log('[SOCKET SERVER] Delete password => ', data)
 
-    let filtered = passwords?.all?.filter(elem => elem !== data)
-
-    console.log('filtered::::', filtered)
-
-    passwords['all'] = filtered
+    let filteredAll = passwords?.all?.filter(elem => elem !== data)
+    let filteredNormal = passwords?.normal?.filter(elem => elem !== data)
+    let filteredPrioritary = passwords?.prioritary?.filter(elem => elem !== data)
+    
+    passwords['all'] = filteredAll
+    passwords['normal'] = filteredNormal
+    passwords['prioritary'] = filteredPrioritary
+    
+    console.log('passwords::', passwords);
     io.sockets.emit('object.passwords', passwords)
   })
 
