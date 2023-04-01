@@ -1,7 +1,7 @@
 const koa = require('koa')
 const http = require('http')
 const socket = require('socket.io')
-require('dotenv').config();
+require('dotenv').config()
 
 const app = new koa()
 const server = http.createServer(app.callback())
@@ -10,14 +10,14 @@ const io = socket(server)
 const SERVER_HOST = process.env.NODE_SOCKET_URL
 const SERVER_PORT = process.env.NODE_SOCKET_PORT
 
-const passwords = {
+let passwords = {
   normal: [],
   prioritary: [],
   all: [],
 }
 
 let passwordList = []
-const passwordListOnDisplay = []
+let passwordListOnDisplay = []
 
 let N = 1
 let P = 1
@@ -43,14 +43,13 @@ const getData = data => {
 const handleNextPassword = (data, firstPassword) => {
   io.sockets.emit('password.next', data)
   io.sockets.emit('password.tv.update', data, false)
-  
   io.sockets.emit(`password.tv.${data}`, firstPassword)
-  data = data.toString().replace(/[{()}]/g, '');
+
+  data = data.toString().replace(/[{()}]/g, '')
   passwordListOnDisplay.push(data)
 
   console.log(`[SOCKET] [SERVER] => NEXT PASSWORD ${firstPassword}`)
 }
-
 
 io.on('connection', socket => {
   console.log('[IO - CLIENT] Connection => server has a new connection')
@@ -73,12 +72,23 @@ io.on('connection', socket => {
     getData(data)
     io.sockets.emit('object.passwords', passwords)
   })
-  
-  socket.on('passwords.deleteOnDisplay', data => {
+
+  socket.on('passwords.delete', data => {
     console.log('[SOCKET SERVER] Delete password => ', data)
 
-    let filtered = passwordList.filter(elem => elem !== data);
-    
+    let filtered = passwords?.all?.filter(elem => elem !== data)
+
+    console.log('filtered::::', filtered)
+
+    passwords['all'] = filtered
+    io.sockets.emit('object.passwords', passwords)
+  })
+
+  socket.on('passwords.deleteOnDisplay', data => {
+    console.log('[SOCKET SERVER] Delete password on display => ', data)
+
+    let filtered = passwordList.filter(elem => elem !== data)
+
     passwordList = filtered
     io.sockets.emit('object.passwordsOnDisplay', passwordList)
     io.sockets.emit('password.tv.update', passwordList, true)
@@ -88,6 +98,23 @@ io.on('connection', socket => {
     passwordList.push(data)
 
     handleNextPassword(passwordList)
+  })
+
+  socket.on('passwords.reset', () => {
+    passwordList.length = 0
+    passwordListOnDisplay.length = 0
+    passwords = {
+      normal: [],
+      prioritary: [],
+      all: [],
+    }
+
+    N = 1
+    P = 1
+
+    io.sockets.emit('object.passwords', passwords)
+    io.sockets.emit('password.onDisplay', passwordList)
+    io.sockets.emit('password.tv.update', passwordList)
   })
 
   socket.on('disconnect', () => {
