@@ -18,9 +18,11 @@ let passwords = {
 
 let passwordList = []
 let passwordListOnDisplay = []
+let passwordListButtonNext = []
 
 let N = 1
 let P = 1
+let count = 0
 
 const getNormalPassword = () => {
   const value = `N${N++}`
@@ -40,15 +42,25 @@ const getData = data => {
   data === 'normal' ? getNormalPassword() : getPrioritaryPassword()
 }
 
-const handleNextPassword = (data, firstPassword) => {
-  io.sockets.emit('password.next', data)
-  io.sockets.emit('password.tv.update', data, false)
-  io.sockets.emit(`password.tv.${data}`, firstPassword)
+let firstPasswordButton
+
+const handleNextPassword = (data, isNextPassword, firstPassword) => {
+  if (isNextPassword) {
+    firstPasswordButton = firstPassword
+    io.sockets.emit('password.next', data)
+    io.sockets.emit('password.tv.update', data)
+    io.sockets.emit(`password.tv.service`, firstPassword)
+    io.sockets.emit('object.passwordsOnDisplay', data)
+  } else {
+    io.sockets.emit('password.next', data)
+    io.sockets.emit('password.tv.update', data, false)
+    // io.sockets.emit(`password.tv.${data}`, firstPassword)
+  }
 
   data = data.toString().replace(/[{()}]/g, '')
   passwordListOnDisplay.push(data)
 
-  console.log(`[SOCKET] [SERVER] => NEXT PASSWORD ${firstPassword}`)
+  console.log(`[SOCKET] [SERVER] => NEXT PASSWORD ${data}`)
 }
 
 io.on('connection', socket => {
@@ -57,13 +69,27 @@ io.on('connection', socket => {
   socket.on('password.onDisplay', data => {
     console.log('[SOCKET SERVER] New password type => ', data)
 
-    io.sockets.emit('object.passwordsOnDisplay', passwordList)
+    io.sockets.emit(
+      'object.passwordsOnDisplay',
+      passwordList
+    )
+  })
+
+  socket.on('password.getEmpty', data => {
+    console.log('[SOCKET SERVER] New password type => ', data)
+
+    if (passwords['all'].length === 0) {
+      io.sockets.emit('password.empty', true)
+    } else {
+      io.sockets.emit('password.empty', false)
+    }
   })
 
   socket.on('password.get', data => {
     console.log('[SOCKET SERVER] New password type => ', data)
 
     io.sockets.emit('object.passwords', passwords)
+    io.sockets.emit('password.tv.service', firstPasswordButton)
   })
 
   socket.on('password.send', data => {
@@ -75,16 +101,16 @@ io.on('connection', socket => {
 
   socket.on('passwords.delete', data => {
     console.log('[SOCKET SERVER] Delete password => ', data)
-
     let filteredAll = passwords?.all?.filter(elem => elem !== data)
     let filteredNormal = passwords?.normal?.filter(elem => elem !== data)
-    let filteredPrioritary = passwords?.prioritary?.filter(elem => elem !== data)
-    
-    passwords['all'] = filteredAll
+    let filteredPrioritary = passwords?.prioritary?.filter(
+      elem => elem !== data
+    )
+
     passwords['normal'] = filteredNormal
+    passwords['all'] = filteredAll
     passwords['prioritary'] = filteredPrioritary
-    
-    console.log('passwords::', passwords);
+
     io.sockets.emit('object.passwords', passwords)
   })
 
@@ -98,10 +124,69 @@ io.on('connection', socket => {
     io.sockets.emit('password.tv.update', passwordList, true)
   })
 
-  socket.on('password.next', data => {
-    passwordList.push(data)
+  socket.on('password.next', (data, isNextPassword) => {
+    if (isNextPassword) {
+      const firstPassword = passwords['all'][0]
 
-    handleNextPassword(passwordList)
+      const isNormalPassword = firstPassword?.startsWith('N') && count < 2
+
+      if (isNormalPassword) {
+        const dataObject = {
+          password: firstPassword,
+          select: data,
+        }
+        passwordList.push(dataObject)
+        handleNextPassword(
+          passwordList,
+          isNextPassword,
+          firstPassword
+        )
+        passwords['all'].splice(0, 1)
+        passwords['normal'].splice(0, 1)
+
+        count++
+      } else {
+        const firstPasswordPrioritary = passwords['prioritary'][0]
+        const isTherePrioritaryPassword = passwords['prioritary'].length > 0
+
+        if (isTherePrioritaryPassword) {
+          const dataObject = {
+            password: firstPasswordPrioritary,
+            select: data,
+          }
+          passwordList.push(dataObject)
+          handleNextPassword(
+            passwordList,
+            isNextPassword,
+            firstPasswordPrioritary
+          )
+          passwords['prioritary'].splice(0, 1)
+          let filtered = passwords['all'].filter(
+            elem => elem !== firstPasswordPrioritary
+          )
+
+          passwords['all'] = filtered
+        } else {
+          const dataObject = {
+            password: firstPassword,
+            select: data,
+          }
+          passwordList.push(dataObject)
+          handleNextPassword(
+            passwordList,
+            isNextPassword,
+            firstPassword
+          )
+          passwords['all'].splice(0, 1)
+        }
+
+        count = 0
+      }
+    } else {
+      passwordList.push(data)
+
+      handleNextPassword(passwordList, isNextPassword, firstPasswordButton)
+    }
   })
 
   socket.on('passwords.reset', () => {
@@ -112,6 +197,7 @@ io.on('connection', socket => {
       prioritary: [],
       all: [],
     }
+    firstPasswordButton = ''
 
     N = 1
     P = 1
