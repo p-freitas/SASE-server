@@ -18,7 +18,7 @@ let passwords = {
 
 let passwordList = []
 let passwordListOnDisplay = []
-let passwordListButtonNext = []
+let allPasswords = []
 
 let N = 1
 let P = 1
@@ -29,6 +29,8 @@ const getNormalPassword = () => {
   passwords['normal'].push(value)
 
   passwords['all'].push(value)
+  allPasswords.push(value)
+  console.log('allPasswords:::', allPasswords)
 }
 
 const getPrioritaryPassword = () => {
@@ -36,6 +38,8 @@ const getPrioritaryPassword = () => {
   passwords['prioritary'].push(value)
 
   passwords['all'].push(value)
+  allPasswords.push(value)
+  console.log('allPasswords:::', allPasswords)
 }
 
 const getData = data => {
@@ -46,16 +50,31 @@ let firstPasswordButton
 
 const handleNextPassword = (data, isNextPassword, firstPassword) => {
   if (isNextPassword) {
+    console.log('entrou 1')
     firstPasswordButton = firstPassword
     io.sockets.emit('password.next', data)
     io.sockets.emit('password.tv.update', data)
     io.sockets.emit(`password.tv.service`, firstPassword)
     io.sockets.emit('object.passwordsOnDisplay', data)
   } else {
+    console.log('entrou 2')
     io.sockets.emit('password.next', data)
     io.sockets.emit('password.tv.update', data, false)
+    io.sockets.emit(`password.tv.service`, firstPassword)
+    io.sockets.emit('object.passwordsOnDisplay', data)
     // io.sockets.emit(`password.tv.${data}`, firstPassword)
   }
+  data = data.toString().replace(/[{()}]/g, '')
+  passwordListOnDisplay.push(data)
+
+  console.log(`[SOCKET] [SERVER] => NEXT PASSWORD ${data}`)
+}
+
+const handleCallPasswordAgain = (data, firstPassword) => {
+  io.sockets.emit('password.next', data)
+  io.sockets.emit('password.tv.update', data, false)
+  io.sockets.emit(`password.tv.service`, firstPassword)
+  io.sockets.emit('object.passwordsOnDisplay', data)
 
   data = data.toString().replace(/[{()}]/g, '')
   passwordListOnDisplay.push(data)
@@ -69,10 +88,7 @@ io.on('connection', socket => {
   socket.on('password.onDisplay', data => {
     console.log('[SOCKET SERVER] New password type => ', data)
 
-    io.sockets.emit(
-      'object.passwordsOnDisplay',
-      passwordList
-    )
+    io.sockets.emit('object.passwordsOnDisplay', passwordList)
   })
 
   socket.on('password.getEmpty', data => {
@@ -92,11 +108,41 @@ io.on('connection', socket => {
     io.sockets.emit('password.tv.service', firstPasswordButton)
   })
 
+  socket.on('password.getAll', data => {
+    console.log('[SOCKET SERVER] New password type => ', data)
+
+    io.sockets.emit('password.sendAll', allPasswords)
+  })
+
+  socket.on('password.CallAgainAllPasswords', data => {
+    console.log('[SOCKET SERVER] New password type => ', data)
+
+    const index = passwordList.findIndex(
+      element => element.password === data.password
+    )
+    console.log('index:::', index)
+
+    if (index === -1) {
+      console.log('index2:::', index)
+      if (passwordList.length < 4) {
+        passwordList.push(data)
+        handleNextPassword(passwordList, false, data?.password)
+      } else {
+        passwordList.shift()
+        passwordList.push(data)
+        handleNextPassword(passwordList, false, data?.password)
+      }
+    }
+  })
+
   socket.on('password.send', data => {
     console.log('[SOCKET SERVER] New password type => ', data)
 
     getData(data)
+
+    console.log(passwords)
     io.sockets.emit('object.passwords', passwords)
+    io.sockets.emit('password.sendAll', allPasswords)
   })
 
   socket.on('passwords.delete', data => {
@@ -135,14 +181,19 @@ io.on('connection', socket => {
           password: firstPassword,
           select: data,
         }
-        passwordList.push(dataObject)
-        handleNextPassword(
-          passwordList,
-          isNextPassword,
-          firstPassword
-        )
-        passwords['all'].splice(0, 1)
-        passwords['normal'].splice(0, 1)
+
+        if (passwordList.length < 4) {
+          passwordList.push(dataObject)
+          handleNextPassword(passwordList, isNextPassword, firstPassword)
+          passwords['all'].splice(0, 1)
+          passwords['normal'].splice(0, 1)
+        } else {
+          passwordList.shift()
+          passwordList.push(dataObject)
+          handleNextPassword(passwordList, isNextPassword, firstPassword)
+          passwords['all'].splice(0, 1)
+          passwords['normal'].splice(0, 1)
+        }
 
         count++
       } else {
@@ -154,38 +205,81 @@ io.on('connection', socket => {
             password: firstPasswordPrioritary,
             select: data,
           }
-          passwordList.push(dataObject)
-          handleNextPassword(
-            passwordList,
-            isNextPassword,
-            firstPasswordPrioritary
-          )
-          passwords['prioritary'].splice(0, 1)
-          let filtered = passwords['all'].filter(
-            elem => elem !== firstPasswordPrioritary
-          )
 
-          passwords['all'] = filtered
+          if (passwordList.length < 4) {
+            passwordList.push(dataObject)
+            handleNextPassword(
+              passwordList,
+              isNextPassword,
+              firstPasswordPrioritary
+            )
+            passwords['prioritary'].splice(0, 1)
+            let filtered = passwords['all'].filter(
+              elem => elem !== firstPasswordPrioritary
+            )
+
+            passwords['all'] = filtered
+          } else {
+            passwordList.shift()
+            passwordList.push(dataObject)
+            handleNextPassword(
+              passwordList,
+              isNextPassword,
+              firstPasswordPrioritary
+            )
+            passwords['prioritary'].splice(0, 1)
+            let filtered = passwords['all'].filter(
+              elem => elem !== firstPasswordPrioritary
+            )
+
+            passwords['all'] = filtered
+          }
         } else {
           const dataObject = {
             password: firstPassword,
             select: data,
           }
-          passwordList.push(dataObject)
-          handleNextPassword(
-            passwordList,
-            isNextPassword,
-            firstPassword
-          )
-          passwords['all'].splice(0, 1)
+
+          if (passwordList.length < 4) {
+            passwordList.push(dataObject)
+            handleNextPassword(passwordList, isNextPassword, firstPassword)
+            passwords['all'].splice(0, 1)
+            passwords['normal'].splice(0, 1)
+          } else {
+            passwordList.shift()
+            passwordList.push(dataObject)
+            handleNextPassword(passwordList, isNextPassword, firstPassword)
+            passwords['all'].splice(0, 1)
+            passwords['normal'].splice(0, 1)
+          }
         }
 
         count = 0
       }
     } else {
-      passwordList.push(data)
+      if (passwordList.length < 4) {
+        passwordList.push(data)
+        handleNextPassword(passwordList, isNextPassword, data?.password)
+      } else {
+        passwordList.shift()
+        passwordList.push(data)
+        handleNextPassword(passwordList, isNextPassword, data?.password)
+      }
+    }
+  })
 
-      handleNextPassword(passwordList, isNextPassword, firstPasswordButton)
+  socket.on('password.callAgain', data => {
+    console.log('entrou')
+    const index = passwordList.findIndex(
+      element => element.password === data.password
+    )
+    console.log('index:::', index)
+
+    if (index !== -1) {
+      // If obj is already in objArr, remove it from its current position and push it to the end
+      passwordList.splice(index, 1)
+      passwordList.push(data)
+      handleCallPasswordAgain(passwordList, data?.password)
     }
   })
 
