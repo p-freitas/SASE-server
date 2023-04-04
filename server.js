@@ -30,7 +30,6 @@ const getNormalPassword = () => {
 
   passwords['all'].push(value)
   allPasswords.push(value)
-  console.log('allPasswords:::', allPasswords)
 }
 
 const getPrioritaryPassword = () => {
@@ -39,7 +38,6 @@ const getPrioritaryPassword = () => {
 
   passwords['all'].push(value)
   allPasswords.push(value)
-  console.log('allPasswords:::', allPasswords)
 }
 
 const getData = data => {
@@ -50,14 +48,12 @@ let firstPasswordButton
 
 const handleNextPassword = (data, isNextPassword, firstPassword) => {
   if (isNextPassword) {
-    console.log('entrou 1')
     firstPasswordButton = firstPassword
     io.sockets.emit('password.next', data)
     io.sockets.emit('password.tv.update', data)
     io.sockets.emit(`password.tv.service`, firstPassword)
     io.sockets.emit('object.passwordsOnDisplay', data)
   } else {
-    console.log('entrou 2')
     io.sockets.emit('password.next', data)
     io.sockets.emit('password.tv.update', data, false)
     io.sockets.emit(`password.tv.service`, firstPassword)
@@ -120,10 +116,8 @@ io.on('connection', socket => {
     const index = passwordList.findIndex(
       element => element.password === data.password
     )
-    console.log('index:::', index)
 
     if (index === -1) {
-      console.log('index2:::', index)
       if (passwordList.length < 4) {
         passwordList.push(data)
         handleNextPassword(passwordList, false, data?.password)
@@ -140,7 +134,6 @@ io.on('connection', socket => {
 
     getData(data)
 
-    console.log(passwords)
     io.sockets.emit('object.passwords', passwords)
     io.sockets.emit('password.sendAll', allPasswords)
   })
@@ -269,11 +262,9 @@ io.on('connection', socket => {
   })
 
   socket.on('password.callAgain', data => {
-    console.log('entrou')
     const index = passwordList.findIndex(
       element => element.password === data.password
     )
-    console.log('index:::', index)
 
     if (index !== -1) {
       // If obj is already in objArr, remove it from its current position and push it to the end
@@ -291,6 +282,7 @@ io.on('connection', socket => {
       prioritary: [],
       all: [],
     }
+    allPasswords = []
     firstPasswordButton = ''
 
     N = 1
@@ -299,6 +291,8 @@ io.on('connection', socket => {
     io.sockets.emit('object.passwords', passwords)
     io.sockets.emit('password.onDisplay', passwordList)
     io.sockets.emit('password.tv.update', passwordList)
+    io.sockets.emit('password.sendAll', allPasswords)
+    io.sockets.emit('password.passwordsOnDisplay', passwordList)
   })
 
   socket.on('disconnect', () => {
