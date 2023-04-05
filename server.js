@@ -19,6 +19,7 @@ let passwords = {
 let passwordList = []
 let passwordListOnDisplay = []
 let allPasswords = []
+let uuid = ''
 
 let N = 1
 let P = 1
@@ -46,17 +47,17 @@ const getData = data => {
 
 let firstPasswordButton
 
-const handleNextPassword = (data, isNextPassword, firstPassword) => {
+const handleNextPassword = (data, isNextPassword, firstPassword, id) => {
   if (isNextPassword) {
     firstPasswordButton = firstPassword
     io.sockets.emit('password.next', data)
     io.sockets.emit('password.tv.update', data)
-    io.sockets.emit(`password.tv.service`, firstPassword)
+    io.sockets.emit(`password.tv.service.${uuid}`, firstPassword)
     io.sockets.emit('object.passwordsOnDisplay', data)
   } else {
     io.sockets.emit('password.next', data)
     io.sockets.emit('password.tv.update', data, false)
-    io.sockets.emit(`password.tv.service`, firstPassword)
+    io.sockets.emit(`password.tv.service.${uuid}`, firstPassword)
     io.sockets.emit('object.passwordsOnDisplay', data)
     // io.sockets.emit(`password.tv.${data}`, firstPassword)
   }
@@ -66,10 +67,10 @@ const handleNextPassword = (data, isNextPassword, firstPassword) => {
   console.log(`[SOCKET] [SERVER] => NEXT PASSWORD ${data}`)
 }
 
-const handleCallPasswordAgain = (data, firstPassword) => {
+const handleCallPasswordAgain = (data, firstPassword, id) => {
   io.sockets.emit('password.next', data)
   io.sockets.emit('password.tv.update', data, false)
-  io.sockets.emit(`password.tv.service`, firstPassword)
+  io.sockets.emit(`password.tv.service.${id}`, firstPassword)
   io.sockets.emit('object.passwordsOnDisplay', data)
 
   data = data.toString().replace(/[{()}]/g, '')
@@ -88,12 +89,12 @@ io.on('connection', socket => {
   })
 
   socket.on('password.getEmpty', data => {
-    console.log('[SOCKET SERVER] New password type => ', data)
+    console.log('[SOCKET SERVER] getEmpty => ', data)
 
     if (passwords['all'].length === 0) {
-      io.sockets.emit('password.empty', true)
+      io.sockets.emit(`password.empty.${data}`, true)
     } else {
-      io.sockets.emit('password.empty', false)
+      io.sockets.emit(`password.empty.${data}`, false)
     }
   })
 
@@ -101,7 +102,7 @@ io.on('connection', socket => {
     console.log('[SOCKET SERVER] New password type => ', data)
 
     io.sockets.emit('object.passwords', passwords)
-    io.sockets.emit('password.tv.service', firstPasswordButton)
+    io.sockets.emit(`password.tv.service.${uuid}`, firstPasswordButton)
   })
 
   socket.on('password.getAll', data => {
@@ -163,7 +164,8 @@ io.on('connection', socket => {
     io.sockets.emit('password.tv.update', passwordList, true)
   })
 
-  socket.on('password.next', (data, isNextPassword) => {
+  socket.on('password.next', (data, isNextPassword, id) => {
+    uuid = id
     if (isNextPassword) {
       const firstPassword = passwords['all'][0]
 
@@ -261,7 +263,7 @@ io.on('connection', socket => {
     }
   })
 
-  socket.on('password.callAgain', data => {
+  socket.on('password.callAgain', (data, id) => {
     const index = passwordList.findIndex(
       element => element.password === data.password
     )
@@ -270,7 +272,7 @@ io.on('connection', socket => {
       // If obj is already in objArr, remove it from its current position and push it to the end
       passwordList.splice(index, 1)
       passwordList.push(data)
-      handleCallPasswordAgain(passwordList, data?.password)
+      handleCallPasswordAgain(passwordList, data?.password, id)
     }
   })
 
@@ -293,6 +295,7 @@ io.on('connection', socket => {
     io.sockets.emit('password.tv.update', passwordList)
     io.sockets.emit('password.sendAll', allPasswords)
     io.sockets.emit('password.passwordsOnDisplay', passwordList)
+    io.sockets.emit('password.reset')
   })
 
   socket.on('disconnect', () => {
